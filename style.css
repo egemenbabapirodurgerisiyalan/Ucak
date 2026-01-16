@@ -1,0 +1,141 @@
+body {
+    margin: 0;
+    overflow: hidden;
+    background-color: #1a1a1a;
+    font-family: 'Segoe UI', sans-serif;
+    color: white;
+    user-select: none; /* Mobilde metin seçimini engelle */
+}
+
+/* Üst Bar */
+#top-bar {
+    position: absolute;
+    top: 0;
+    right: 0;
+    z-index: 1000;
+    background: rgba(0,0,0,0.6);
+    padding: 10px;
+    border-bottom-left-radius: 10px;
+    display: flex;
+    gap: 15px;
+    align-items: center;
+}
+.logo { font-weight: bold; color: #FFD700; font-size: 1.2rem; }
+select { background: #333; color: white; border: 1px solid #555; padding: 5px; }
+
+/* Giriş Ekranı */
+#login-container {
+    position: absolute;
+    top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+    background: rgba(0,0,0,0.85);
+    padding: 30px;
+    border-radius: 15px;
+    text-align: center;
+    width: 300px;
+    z-index: 2000;
+    border: 2px solid #FFD700;
+}
+input, button { width: 100%; margin: 8px 0; padding: 12px; box-sizing: border-box; border-radius: 5px; border: none; }
+#btn-login { background: #28a745; color: white; font-weight: bold; cursor: pointer; }
+#btn-google { background: #db4437; color: white; cursor: pointer; }
+
+/* Oyun UI */
+#stats-panel {
+    position: absolute;
+    top: 10px;
+    left: 10px;
+    display: flex;
+    gap: 10px;
+    z-index: 100;
+}
+.stat-box {
+    padding: 8px 15px;
+    background: rgba(0,0,0,0.6);
+    border-radius: 5px;
+    font-weight: bold;
+    font-size: 1.1rem;
+    border: 1px solid rgba(255,255,255,0.2);
+}
+.red { color: #ff4444; }
+.yellow { color: #ffbb33; }
+.green { color: #00C851; }
+
+#crosshair {
+    position: absolute;
+    top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+    color: rgba(0, 255, 0, 0.7);
+    font-size: 2rem;
+    pointer-events: none;
+    z-index: 90;
+}
+
+/* Mobil Kontroller */
+#mobile-controls {
+    display: none; /* PC'de gizli, JS ile mobilde açacağız */
+    position: absolute;
+    bottom: 20px;
+    width: 100%;
+    height: 150px;
+    pointer-events: none; /* Dokunmatik olaylar butonlara geçsin diye */
+    z-index: 100;
+}
+
+#joystick-area {
+    position: absolute;
+    bottom: 20px;
+    left: 20px;
+    width: 120px;
+    height: 120px;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 50%;
+    border: 2px solid rgba(255,255,255,0.3);
+    pointer-events: auto;
+}
+
+#joystick-knob {
+    position: absolute;
+    top: 50%; left: 50%;
+    width: 40px; height: 40px;
+    background: rgba(255, 215, 0, 0.8);
+    border-radius: 50%;
+    transform: translate(-50%, -50%);
+}
+
+#action-buttons {
+    position: absolute;
+    bottom: 20px;
+    right: 20px;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 10px;
+    pointer-events: auto;
+}
+
+.throttle-group { display: flex; gap: 10px; }
+#action-buttons button {
+    width: 80px;
+    height: 60px;
+    background: rgba(0,0,0,0.5);
+    border: 1px solid white;
+    color: white;
+    font-weight: bold;
+    border-radius: 10px;
+}
+#action-buttons button:active { background: white; color: black; }
+
+.fire-btn {
+    width: 60px !important;
+    height: 60px !important;
+    border-radius: 50% !important;
+    background: rgba(255, 0, 0, 0.6) !important;
+    border: 2px solid red !important;
+    margin-bottom: 10px;
+}
+
+/* Sadece mobilde kontrolleri göster */
+@media (max-width: 768px) {
+    #mobile-controls { display: block; }
+  }
