@@ -1,0 +1,311 @@
+// --- KÜTÜPHANELER ---
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+import { getAuth, signInWithPopup, GoogleAuthProvider, signInWithEmailAndPassword, createUserWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
+import { getFirestore, doc, getDoc, setDoc, updateDoc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+import * as THREE from 'three';
+
+// --- SENİN VERDİĞİN FIREBASE AYARLARI ---
+const firebaseConfig = {
+  apiKey: "AIzaSyDpGq40BwrP-GKNWuAwy5aLg5ja02RB0PU",
+  authDomain: "eggapps-fb796.firebaseapp.com",
+  projectId: "eggapps-fb796",
+  storageBucket: "eggapps-fb796.firebasestorage.app",
+  messagingSenderId: "60193983441",
+  appId: "1:60193983441:web:b09e8ad860ab858e69aef0",
+  measurementId: "G-P222SB4V1X"
+};
+
+// Firebase Başlat
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db = getFirestore(app);
+
+// --- DEĞİŞKENLER & DURUM ---
+let currentUser = null;
+let scene, camera, renderer, planeMesh;
+let bullets = [];
+let lastShotTime = 0;
+let reloadTimer = null;
+
+// Oyun Durumu
+const gameState = {
+    isPlaying: false,
+    speed: 0,
+    maxSpeed: 2.0,
+    turnSpeed: 0,
+    health: 100,
+    ammo: 100,
+    money: 0
+};
+
+// Kontrol Girişleri
+const inputs = {
+    forward: false,
+    backward: false,
+    left: false,
+    right: false,
+    shoot: false
+};
+
+// --- GİRİŞ İŞLEMLERİ (Önceki kodla aynı mantık) ---
+const loginContainer = document.getElementById('login-container');
+const gameUI = document.getElementById('game-ui');
+const errorMsg = document.getElementById('error-msg');
+
+document.getElementById('btn-google').addEventListener('click', () => {
+    signInWithPopup(auth, new GoogleAuthProvider())
+        .then((res) => loadUserProfile(res.user))
+        .catch((err) => errorMsg.textContent = err.message);
+});
+
+document.getElementById('login-form').addEventListener('submit', (e) => {
+    e.preventDefault();
+    const email = document.getElementById('email').value;
+    const pass = document.getElementById('password').value;
+    signInWithEmailAndPassword(auth, email, pass)
+        .then((res) => loadUserProfile(res.user))
+        .catch((err) => {
+            createUserWithEmailAndPassword(auth, email, pass)
+                .then((res) => loadUserProfile(res.user))
+                .catch((e) => errorMsg.textContent = e.message);
+        });
+});
+
+async function loadUserProfile(user) {
+    currentUser = user;
+    const ref = doc(db, "users", user.uid);
+    const snap = await getDoc(ref);
+
+    if (snap.exists()) {
+        const data = snap.data();
+        gameState.money = data.money;
+        // Kayıtlı verileri al
+    } else {
+        await setDoc(ref, {
+            email: user.email,
+            money: 0,
+            tutorialDone: false
+        });
+    }
+    
+    startGame();
+}
+
+// --- OYUN BAŞLATMA & THREE.JS ---
+function startGame() {
+    loginContainer.style.display = 'none';
+    gameUI.style.display = 'block';
+    gameState.isPlaying = true;
+    updateUI();
+
+    init3D();
+    animate();
+}
+
+function init3D() {
+    // Sahne
+    scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x87CEEB); // Gökyüzü mavisi
+    scene.fog = new THREE.Fog(0x87CEEB, 10, 500);
+
+    // Kamera
+    camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+    camera.position.set(0, 5, 10);
+    camera.lookAt(0, 0, 0);
+
+    // Renderer
+    renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    document.body.appendChild(renderer.domElement);
+
+    // Işıklar
+    const light = new THREE.DirectionalLight(0xffffff, 1);
+    light.position.set(10, 20, 10);
+    scene.add(light);
+    scene.add(new THREE.AmbientLight(0x404040));
+
+    // Zemin (Grid)
+    const gridHelper = new THREE.GridHelper(1000, 100, 0x000000, 0x000000);
+    scene.add(gridHelper);
+    
+    // Basit Zemin (Yeşil)
+    const groundGeo = new THREE.PlaneGeometry(2000, 2000);
+    const groundMat = new THREE.MeshBasicMaterial({ color: 0x228B22, side: THREE.DoubleSide });
+    const ground = new THREE.Mesh(groundGeo, groundMat);
+    ground.rotation.x = -Math.PI / 2;
+    ground.position.y = -0.1;
+    scene.add(ground);
+
+    // Uçak (Geçici Model: Sarı Kutu)
+    const geometry = new THREE.BoxGeometry(1, 0.5, 2);
+    const material = new THREE.MeshStandardMaterial({ color: 0xFFD700 });
+    planeMesh = new THREE.Mesh(geometry, material);
+    planeMesh.position.y = 2; // Havada başla
+    scene.add(planeMesh);
+}
+
+// --- OYUN DÖNGÜSÜ ---
+function animate() {
+    requestAnimationFrame(animate);
+    if (!gameState.isPlaying) return;
+
+    // 1. Hareket Mantığı
+    if (inputs.forward && gameState.speed < gameState.maxSpeed) gameState.speed += 0.02;
+    if (inputs.backward && gameState.speed > 0) gameState.speed -= 0.05;
+    if (!inputs.forward && !inputs.backward) gameState.speed *= 0.99; // Sürtünme
+
+    // Dönüş (Sadece hareket ederken döner)
+    if (gameState.speed > 0.1) {
+        if (inputs.left) planeMesh.rotation.y += 0.03;
+        if (inputs.right) planeMesh.rotation.y -= 0.03;
+    }
+
+    // İlerleme (Uçağın baktığı yöne git)
+    planeMesh.translateZ(-gameState.speed);
+
+    // Kamerayı Uçağa Sabitle (TPS Modu)
+    const relativeCameraOffset = new THREE.Vector3(0, 3, 7);
+    const cameraOffset = relativeCameraOffset.applyMatrix4(planeMesh.matrixWorld);
+    camera.position.lerp(cameraOffset, 0.1); // Yumuşak takip
+    camera.lookAt(planeMesh.position);
+
+    // 2. Ateş Mantığı
+    handleShooting();
+
+    // 3. Mermileri Güncelle
+    updateBullets();
+
+    renderer.render(scene, camera);
+}
+
+// --- ATEŞ ETME SİSTEMİ ---
+function handleShooting() {
+    // 5 Saniye kuralı için zamanlayıcı kontrolü
+    if (Date.now() - lastShotTime > 5000 && gameState.ammo < 100) {
+        gameState.ammo += 0.2; // Yavaşça dolum
+        if(gameState.ammo > 100) gameState.ammo = 100;
+        updateUI();
+    }
+
+    if (inputs.shoot && gameState.ammo >= 1) {
+        if (Date.now() - lastShotTime > 100) { // Ateş hızı (taramalı)
+            shootBullet();
+            lastShotTime = Date.now();
+        }
+    }
+}
+
+function shootBullet() {
+    gameState.ammo -= 1;
+    updateUI();
+
+    const bulletGeo = new THREE.SphereGeometry(0.1, 8, 8);
+    const bulletMat = new THREE.MeshBasicMaterial({ color: 0xff0000 });
+    const bullet = new THREE.Mesh(bulletGeo, bulletMat);
+
+    // Mermi uçağın konumundan başlar
+    bullet.position.copy(planeMesh.position);
+    bullet.quaternion.copy(planeMesh.quaternion); // Uçağın yönünü alır
+    
+    // Mermiye hız vektörü ekle (User data içinde saklayalım)
+    bullet.userData = { velocity: new THREE.Vector3(0, 0, -5).applyQuaternion(planeMesh.quaternion) };
+    
+    bullets.push(bullet);
+    scene.add(bullet);
+}
+
+function updateBullets() {
+    for (let i = bullets.length - 1; i >= 0; i--) {
+        const b = bullets[i];
+        b.position.add(b.userData.velocity);
+        
+        // Uzaklaşan mermileri sil
+        if (b.position.distanceTo(planeMesh.position) > 200) {
+            scene.remove(b);
+            bullets.splice(i, 1);
+        }
+    }
+}
+
+function updateUI() {
+    document.getElementById('ammo-disp').innerText = Math.floor(gameState.ammo);
+    document.getElementById('money-disp').innerText = gameState.money.toFixed(2);
+    document.getElementById('health-disp').innerText = gameState.health;
+}
+
+// --- KONTROLLER (PC & MOBİL EŞİTLEME) ---
+
+// PC Klavye
+window.addEventListener('keydown', (e) => {
+    if (e.key === 'w' || e.key === 'W') inputs.forward = true;
+    if (e.key === 's' || e.key === 'S') inputs.backward = true;
+    if (e.key === 'a' || e.key === 'A') inputs.left = true;
+    if (e.key === 'd' || e.key === 'D') inputs.right = true;
+});
+
+window.addEventListener('keyup', (e) => {
+    if (e.key === 'w' || e.key === 'W') inputs.forward = false;
+    if (e.key === 's' || e.key === 'S') inputs.backward = false;
+    if (e.key === 'a' || e.key === 'A') inputs.left = false;
+    if (e.key === 'd' || e.key === 'D') inputs.right = false;
+});
+
+// PC Mouse Ateş (Sol Tık)
+window.addEventListener('mousedown', () => inputs.shoot = true);
+window.addEventListener('mouseup', () => inputs.shoot = false);
+
+// Mobil Butonlar
+const btnGas = document.getElementById('btn-gas');
+const btnBrake = document.getElementById('btn-brake');
+const btnShoot = document.getElementById('btn-shoot');
+
+btnGas.addEventListener('touchstart', (e) => { e.preventDefault(); inputs.forward = true; });
+btnGas.addEventListener('touchend', (e) => { e.preventDefault(); inputs.forward = false; });
+
+btnBrake.addEventListener('touchstart', (e) => { e.preventDefault(); inputs.backward = true; });
+btnBrake.addEventListener('touchend', (e) => { e.preventDefault(); inputs.backward = false; });
+
+btnShoot.addEventListener('touchstart', (e) => { e.preventDefault(); inputs.shoot = true; });
+btnShoot.addEventListener('touchend', (e) => { e.preventDefault(); inputs.shoot = false; });
+
+// Mobil Joystick (Basit Mantık)
+const joystickArea = document.getElementById('joystick-area');
+const joystickKnob = document.getElementById('joystick-knob');
+let joystickActive = false;
+let startX = 0;
+
+joystickArea.addEventListener('touchstart', (e) => {
+    joystickActive = true;
+    startX = e.touches[0].clientX;
+});
+
+joystickArea.addEventListener('touchmove', (e) => {
+    if (!joystickActive) return;
+    const currentX = e.touches[0].clientX;
+    const diff = currentX - startX;
+    
+    // Görsel hareket (Sınırla)
+    let moveX = Math.max(-40, Math.min(40, diff));
+    joystickKnob.style.transform = `translate(calc(-50% + ${moveX}px), -50%)`;
+
+    // Input tetikle
+    if (moveX < -10) { inputs.left = true; inputs.right = false; }
+    else if (moveX > 10) { inputs.right = true; inputs.left = false; }
+    else { inputs.left = false; inputs.right = false; }
+});
+
+joystickArea.addEventListener('touchend', () => {
+    joystickActive = false;
+    joystickKnob.style.transform = `translate(-50%, -50%)`;
+    inputs.left = false;
+    inputs.right = false;
+});
+
+// Pencere Boyutlandırma
+window.addEventListener('resize', () => {
+    if(camera && renderer) {
+        camera.aspect = window.innerWidth / window.innerHeight;
+        camera.updateProjectionMatrix();
+        renderer.setSize(window.innerWidth, window.innerHeight);
+    }
+});
