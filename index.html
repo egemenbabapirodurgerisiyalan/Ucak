@@ -23,25 +23,32 @@
             <select id="lang-select">
                 <option value="tr">Türkçe</option>
                 <option value="en">English</option>
-                <option value="de">Deutsch</option>
-                <option value="fr">Français</option>
-                <option value="ru">Русский</option>
-                <option value="nl">Nederlands</option>
-                <option value="es">Español</option>
-                <option value="it">Italiano</option>
-            </select>
+                </select>
         </div>
     </div>
 
-    <div id="login-container">
-        <h1>PİLOT GİRİŞİ</h1>
-        <form id="login-form">
-            <input type="email" id="email" placeholder="E-posta" required>
-            <input type="password" id="password" placeholder="Şifre" required>
-            <button type="submit" id="btn-login">GİRİŞ / KAYIT</button>
+    <div id="auth-container">
+        <div class="auth-tabs">
+            <button id="tab-login" class="active">GİRİŞ YAP</button>
+            <button id="tab-register">KAYIT OL</button>
+        </div>
+
+        <form id="form-login">
+            <input type="email" id="login-email" placeholder="E-posta Adresi" required>
+            <input type="password" id="login-pass" placeholder="Şifre" required>
+            <button type="submit" class="action-btn">GİRİŞ YAP</button>
         </form>
-        <button id="btn-google">GOOGLE İLE GİRİŞ</button>
-        <p id="error-msg"></p>
+
+        <form id="form-register" style="display: none;">
+            <input type="email" id="reg-email" placeholder="Yeni E-posta" required>
+            <input type="password" id="reg-pass" placeholder="Yeni Şifre (En az 6 karakter)" required>
+            <button type="submit" class="action-btn register-btn">HESAP OLUŞTUR</button>
+        </form>
+
+        <hr>
+        <button id="btn-google" class="google-btn">GOOGLE İLE DEVAM ET</button>
+        
+        <div id="status-msg" style="margin-top: 10px; color: yellow; font-size: 0.9rem;"></div>
     </div>
 
     <div id="game-ui" style="display: none;">
@@ -50,18 +57,14 @@
             <div class="stat-box yellow">⚡ <span id="ammo-disp">100</span></div>
             <div class="stat-box green">₺ <span id="money-disp">0.00</span></div>
         </div>
-
         <div id="crosshair">+</div>
-
         <div id="mobile-controls">
-            <div id="joystick-area">
-                <div id="joystick-knob"></div>
-            </div>
+            <div id="joystick-area"><div id="joystick-knob"></div></div>
             <div id="action-buttons">
                 <button id="btn-shoot" class="fire-btn">ATEŞ</button>
                 <div class="throttle-group">
-                    <button id="btn-gas">GAZ (W)</button>
-                    <button id="btn-brake">FREN (S)</button>
+                    <button id="btn-gas">GAZ</button>
+                    <button id="btn-brake">FREN</button>
                 </div>
             </div>
         </div>
